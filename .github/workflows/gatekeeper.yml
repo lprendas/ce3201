@@ -1,0 +1,43 @@
+name: Verification Gatekeeper
+
+on:
+  pull_request:
+
+jobs:
+  open-source-verification:
+    runs-on: ubuntu-latest
+    # GitHub-hosted runners are Linux-based, so the portable open-source flow runs here.
+    # Native Quartus synthesis/place-and-route stays on the Windows host where Quartus is installed.
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Execute Simulation
+        uses: devcontainers/ci@v0.3
+        with:
+          runCmd: make
+
+  repo-artifact-validation:
+    runs-on: ubuntu-latest
+    needs: open-source-verification
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for canonical Quartus report
+        run: |
+          if [ ! -f "output_files/adder.flow.rpt" ]; then
+            echo "Error: Local synthesis artefact missing."
+            exit 1
+          fi
+
+      - name: Verify local compilation success
+        run: |
+          if grep -q "Successful" output_files/adder.flow.rpt; then
+            echo "Local synthesis verified."
+          else
+            echo "Error: Local synthesis was not successful."
+            exit 1
+          fi
